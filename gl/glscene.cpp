@@ -2,7 +2,7 @@
 
 BSD License
 
-Copyright (c) 2005-2010, NIF File Format Library and Tools
+Copyright (c) 2005-2012, NIF File Format Library and Tools
 All rights reserved.
 
 Redistribution and use in source and binary forms, with or without
@@ -150,7 +150,7 @@ Node * Scene::getNode( const NifModel * nif, const QModelIndex & iNode )
 		else
 			node = new Node( this, iNode );
 	}
-	else if ( nif->itemName( iNode ) == "NiTriShape" || nif->itemName( iNode ) == "NiTriStrips" )
+	else if ( nif->itemName( iNode ) == "NiTriShape" || nif->itemName( iNode ) == "NiTriStrips" || nif->inherits( iNode, "NiTriBasedGeom") )
 	{
 		node = new Mesh( this, iNode );
 	}
@@ -162,6 +162,11 @@ Node * Scene::getNode( const NifModel * nif, const QModelIndex & iNode )
 	else if ( nif->inherits( iNode, "NiParticles" ) ) // ... where did AParticleSystem go?
 	{
 		node = new Particles( this, iNode );
+	}
+	else if (nif->inherits( iNode, "NiAVObject"))
+	{
+		if ( nif->itemName( iNode ) == "BSTreeNode" )
+			node = new Node( this, iNode );
 	}
 
 	if ( node )
@@ -241,6 +246,9 @@ void Scene::drawShapes()
 		foreach ( Node * node, roots.list() )
 			node->drawShapes( &draw2nd );
 		
+		if ( draw2nd.list().count() > 0 )
+			drawSelection ();// for transparency pass
+
 		draw2nd.sort();
 		
 		foreach ( Node * node, draw2nd.list() )
@@ -273,6 +281,8 @@ void Scene::drawFurn()
 
 void Scene::drawSelection() const
 {
+	if (Node::SELECTING)
+		return;// do not render the selection when selecting
 	foreach ( Node * node, nodes.list() )
 		node->drawSelection();
 }

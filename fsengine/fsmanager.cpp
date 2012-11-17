@@ -2,7 +2,7 @@
 
 BSD License
 
-Copyright (c) 2005-2010, NIF File Format Library and Tools
+Copyright (c) 2005-2012, NIF File Format Library and Tools
 All rights reserved.
 
 Redistribution and use in source and binary forms, with or without
@@ -43,6 +43,8 @@ THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #include <QPushButton>
 #include <QSettings>
 #include <QStringListModel>
+
+#include "../options.h"
 
 //! Global BSA file manager
 static FSManager *theFSManager = NULL;
@@ -220,7 +222,6 @@ void FSSelector::sltAdd()
 void FSSelector::sltDel()
 {
 	QString an = view->currentIndex().data( Qt::DisplayRole ).toString();
-	
 	if ( FSArchiveHandler * a = manager->archives.take( an ) )
 	{
 		delete a;

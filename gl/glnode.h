@@ -2,7 +2,7 @@
 
 BSD License
 
-Copyright (c) 2005-2010, NIF File Format Library and Tools
+Copyright (c) 2005-2012, NIF File Format Library and Tools
 All rights reserved.
 
 Redistribution and use in source and binary forms, with or without
@@ -117,7 +117,9 @@ public:
 	Controller * findController( const QString & proptype, const QString & ctrltype, const QString & var1, const QString & var2 );
 
 	virtual QString textStats() const;
-	
+
+	static int SELECTING;
+
 protected:
 	virtual void setController( const NifModel * nif, const QModelIndex & controller );
 

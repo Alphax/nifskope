@@ -2,7 +2,7 @@
 
 BSD License
 
-Copyright (c) 2005-2010, NIF File Format Library and Tools
+Copyright (c) 2005-2012, NIF File Format Library and Tools
 All rights reserved.
 
 Redistribution and use in source and binary forms, with or without
@@ -36,7 +36,7 @@ THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #include "gltools.h"
 #include "../options.h"
 
-#include <GL/glext.h>
+#include "GLee.h"
 
 #include <QDebug>
 
@@ -218,7 +218,7 @@ void Mesh::clear()
 	colors.clear();
 	coords.clear();
 	tangents.clear();
-	binormals.clear();
+	bitangents.clear();
 	triangles.clear();
 	tristrips.clear();
 	weights.clear();
@@ -229,7 +229,9 @@ void Mesh::clear()
 	transNorms.clear();
 	transColors.clear();
 	transTangents.clear();
-	transBinormals.clear();
+	transBitangents.clear();
+
+	double_sided = false;
 }
 
 void Mesh::update( const NifModel * nif, const QModelIndex & index )
@@ -521,11 +523,64 @@ void Mesh::transform()
 		else
 		{
 			
+			// Handle some vertex color animation - the static part.
+			// The elegant way requires TODO: property system (glproperty.h,
+			// glproperty.cpp, renderer.cpp, etc.) complete refactoring.
+			// Refer to "nif.xml" for "SF_Vertex_Animation", "PROP_LightingShaderProperty" and "FLAG_ShaderFlags"
+#define SF_Vertex_Animation 29
+#define SF_Double_Sided 4
+#define PROP_LightingShaderProperty "BSLightingShaderProperty"
+#define PROP_BSEffectShaderProperty "BSEffectShaderProperty"
+#define FLAG_ShaderFlags "Shader Flags 2"
+#define FLAG_EffectShaderFlags1 "Effect Shader Flags 1"
+			bool alphaisanim = false;
+			double_sided = false;
+			double_sided_es = false;
+			if ( nif->checkVersion( 0x14020007, 0 ) && nif->inherits( iBlock, "NiTriBasedGeom") )
+			{
+				QVector<qint32> props =
+				  nif->getLinkArray( iBlock, "Properties" )
+				  + nif->getLinkArray( iBlock, "BS Properties" );
+				for (int i = 0; i < props.count(); i++)
+				{
+					QModelIndex iProp = nif->getBlock( props[i], PROP_LightingShaderProperty );
+					if (iProp.isValid())
+					{
+						// TODO: check that it exists at all
+						unsigned int sf2 = nif->get<unsigned int>(iProp, FLAG_ShaderFlags);
+						// using nifvalue.cpp line ~211
+						double_sided = sf2 & (1 << SF_Double_Sided);
+						if (sf2 & (1 << SF_Vertex_Animation)) {
+							alphaisanim = true;
+							break;
+						}
+					} else
+					{
+						// enable double_sided for BSEffectShaderProperty
+						iProp = nif->getBlock( props[i], PROP_BSEffectShaderProperty );
+						if (iProp.isValid())
+						{
+							unsigned int sf1 = nif->get<unsigned int>(iProp, FLAG_EffectShaderFlags1);
+							double_sided_es = sf1 & (1 << SF_Double_Sided);
+						}
+					}
+				}
+			}
+#undef FLAG_EffectShaderFlags1
+#undef PROP_BSEffectShaderProperty
+#undef PROP_LightingShaderProperty
+#undef FLAG_ShaderFlags
+#undef SF_Double_Sided
+#undef SF_Vertex_Animation
+			
 			verts = nif->getArray<Vector3>( iData, "Vertices" );
 			norms = nif->getArray<Vector3>( iData, "Normals" );
 			colors = nif->getArray<Color4>( iData, "Vertex Colors" );
+			if (alphaisanim)
+				for (int i = 0; i < colors.count(); i++)
+					colors[i].setRGBA(colors[i].red(), colors[i].green(), colors[i].blue(), 1);
 			tangents = nif->getArray<Vector3>( iData, "Tangents" );
-			binormals = nif->getArray<Vector3>( iData, "Binormals" );
+			bitangents = nif->getArray<Vector3>( iData, "Bitangents" );
 			
 			if ( norms.count() < verts.count() ) norms.clear();
 			if ( colors.count() < verts.count() ) colors.clear();
@@ -545,7 +600,30 @@ void Mesh::transform()
 			
 			if ( nif->itemName( iData ) == "NiTriShapeData" )
 			{
-				triangles = nif->getArray<Triangle>( iData, "Triangles" );
+				// check indexes
+				// TODO: check other indexes as well
+				QVector<Triangle> ftriangles = nif->getArray<Triangle>( iData, "Triangles" );
+				triangles.clear ();
+				int inv_idx = 0;
+				int inv_cnt = 0;
+				for (int i = 0; i < ftriangles.count (); i++) {
+					Triangle t = ftriangles[i];
+					inv_idx = 0;
+					for (int j = 0; j < 3; j++)
+						if (t[j] >= verts.count ()) {
+							inv_idx = 1;
+							break;
+						}
+					if (!inv_idx)
+						triangles.append (t);
+				}
+				inv_cnt = ftriangles.count () - triangles.count ();
+				ftriangles.clear ();
+				if (inv_cnt > 0) {
+					int block_idx = nif->getBlockNumber (nif->getIndex( iData, "Triangles"));
+					qWarning() << "Error: " << inv_cnt << " invalid index(es) in block #"
+						<< block_idx << " NiTriShapeData.Triangles";
+				}
 				tristrips.clear();
 			}
 			else if ( nif->itemName( iData ) == "NiTriStripsData" )
@@ -580,12 +658,12 @@ void Mesh::transform()
 						if ( data.count() == verts.count() * 4 * 3 * 2 )
 						{
 							tangents.resize( verts.count() );
-							binormals.resize( verts.count() );
+							bitangents.resize( verts.count() );
 							Vector3 * t = (Vector3 *) data.data();
 							for ( int c = 0; c < verts.count(); c++ )
 								tangents[c] = *t++;
 							for ( int c = 0; c < verts.count(); c++ )
-								binormals[c] = *t++;
+								bitangents[c] = *t++;
 						}
 					}
 				}
@@ -607,11 +685,13 @@ void Mesh::transform()
 		bones = nif->getLinkArray( iSkin, "Bones" );
 		
 		QModelIndex idxBones = nif->getIndex( iSkinData, "Bone List" );
-		if ( idxBones.isValid() )
+		unsigned char hvw = nif->get<unsigned char> (iSkinData, "Has Vertex Weights");
+		int vcnt = hvw ? 0 : verts.count();
+		if ( idxBones.isValid() /*&& hvw*/ )
 		{
 			for ( int b = 0; b < nif->rowCount( idxBones ) && b < bones.count(); b++ )
 			{
-				weights.append( BoneWeights( nif, idxBones.child( b, 0 ), bones[ b ] ) );
+				weights.append( BoneWeights( nif, idxBones.child( b, 0 ), bones[ b ], vcnt) );
 			}
 		}
 		
@@ -651,8 +731,8 @@ void Mesh::transformShapes()
 		transNorms.fill( Vector3() );
 		transTangents.resize( tangents.count() );
 		transTangents.fill( Vector3() );
-		transBinormals.resize( binormals.count() );
-		transBinormals.fill( Vector3() );
+		transBitangents.resize( bitangents.count() );
+		transBitangents.fill( Vector3() );
 		
 		Node * root = findParent( skelRoot );
 		
@@ -688,8 +768,8 @@ void Mesh::transformShapes()
 								transNorms[vindex] += trans.rotation * norms[ vindex ] * weight.second;
 							if ( tangents.count() > vindex )
 								transTangents[vindex] += trans.rotation * tangents[ vindex ] * weight.second;
-							if ( binormals.count() > vindex )
-								transBinormals[vindex] += trans.rotation * binormals[ vindex ] * weight.second;
+							if ( bitangents.count() > vindex )
+								transBitangents[vindex] += trans.rotation * bitangents[ vindex ] * weight.second;
 						}
 					}
 				}
@@ -714,8 +794,8 @@ void Mesh::transformShapes()
 						transNorms[ vw.vertex ] += natrix * norms[ vw.vertex ] * vw.weight;
 					if ( transTangents.count() > vw.vertex )
 						transTangents[ vw.vertex ] += natrix * tangents[ vw.vertex ] * vw.weight;
-					if ( transBinormals.count() > vw.vertex )
-						transBinormals[ vw.vertex ] += natrix * binormals[ vw.vertex ] * vw.weight;
+					if ( transBitangents.count() > vw.vertex )
+						transBitangents[ vw.vertex ] += natrix * bitangents[ vw.vertex ] * vw.weight;
 				}
 			}
 		}
@@ -724,8 +804,8 @@ void Mesh::transformShapes()
 			transNorms[n].normalize();
 		for ( int t = 0; t < transTangents.count(); t++ )
 			transTangents[t].normalize();
-		for ( int t = 0; t < transBinormals.count(); t++ )
-			transBinormals[t].normalize();
+		for ( int t = 0; t < transBitangents.count(); t++ )
+			transBitangents[t].normalize();
 		
 		bndSphere = BoundSphere( transVerts );
 		bndSphere.applyInv( viewTrans() );
@@ -736,7 +816,7 @@ void Mesh::transformShapes()
 		transVerts = verts;
 		transNorms = norms;
 		transTangents = tangents;
-		transBinormals = binormals;
+		transBitangents = bitangents;
 	}
 	
 	/*
@@ -813,8 +893,12 @@ void Mesh::drawShapes( NodeList * draw2nd )
 {
 	if ( isHidden() || !Options::drawMeshes() )
 		return;
-	
-	glLoadName( nodeId );
+
+	//glLoadName( nodeId ); - disabled glRenderMode( GL_SELECT );
+	if (Node::SELECTING) {
+		int s_nodeId = ID2COLORKEY( nodeId );
+		glColor4ubv( (GLubyte *)&s_nodeId );
+	}
 	
 	// draw transparent meshes during second run
 	
@@ -838,35 +922,49 @@ void Mesh::drawShapes( NodeList * draw2nd )
 	glEnableClientState( GL_VERTEX_ARRAY );
 	glVertexPointer( 3, GL_FLOAT, 0, transVerts.data() );
 	
-	if ( transNorms.count() )
-	{
-		glEnableClientState( GL_NORMAL_ARRAY );
-		glNormalPointer( GL_FLOAT, 0, transNorms.data() );
+	if (!Node::SELECTING) {
+		if ( transNorms.count() )
+		{
+			glEnableClientState( GL_NORMAL_ARRAY );
+			glNormalPointer( GL_FLOAT, 0, transNorms.data() );
+		}
+	
+		if ( transColors.count() )
+		{
+			glEnableClientState( GL_COLOR_ARRAY );
+			glColorPointer( 4, GL_FLOAT, 0, transColors.data() );
+		}
+		else
+			glColor( Color3( 1.0f, 0.2f, 1.0f ) );
 	}
 	
-	if ( transColors.count() )
+	if (!Node::SELECTING)
+		shader = scene->renderer.setupProgram( this, shader );
+	
+	if (double_sided || double_sided_es)
 	{
-		glEnableClientState( GL_COLOR_ARRAY );
-		glColorPointer( 4, GL_FLOAT, 0, transColors.data() );
+		if (double_sided_es)// TODO: reintroduce sorting if need be
+			glDepthMask( GL_FALSE );
+		glDisable( GL_CULL_FACE );
 	}
-	else
-		glColor( Color3( 1.0f, 0.2f, 1.0f ) );
-	
-	
-	shader = scene->renderer.setupProgram( this, shader );
-	
-	
-	// render the triangles
 
+	// render the triangles
 	if ( sortedTriangles.count() )
 		glDrawElements( GL_TRIANGLES, sortedTriangles.count() * 3, GL_UNSIGNED_SHORT, sortedTriangles.data() );
 	
 	// render the tristrips
-	
 	for ( int s = 0; s < tristrips.count(); s++ )
 		glDrawElements( GL_TRIANGLE_STRIP, tristrips[s].count(), GL_UNSIGNED_SHORT, tristrips[s].data() );
-	
-	scene->renderer.stopProgram();
+
+	if (double_sided || double_sided_es)
+	{
+		glEnable( GL_CULL_FACE );
+		if (double_sided_es)
+			glDepthMask( GL_TRUE );
+	}
+
+	if (!Node::SELECTING)
+		scene->renderer.stopProgram();
 
 	glDisableClientState( GL_VERTEX_ARRAY );
 	glDisableClientState( GL_NORMAL_ARRAY );
@@ -915,12 +1013,12 @@ void Mesh::drawSelection() const
 	}
 	else if ( scene->currentBlock == iData || scene->currentBlock == iSkinPart )
 	{
-		n = scene->currentIndex.data( Qt::DisplayRole ).toString();
+		n = scene->currentIndex.data( NifSkopeDisplayRole ).toString();
 		
 		QModelIndex iParent = scene->currentIndex.parent();
 		if ( iParent.isValid() && iParent != iData )
 		{
-			n = iParent.data( Qt::DisplayRole ).toString();
+			n = iParent.data( NifSkopeDisplayRole ).toString();
 			i = scene->currentIndex.row();
 		}
 	}
@@ -930,7 +1028,7 @@ void Mesh::drawSelection() const
 	}
 	
 	if ( n == "Vertices" || n == "Normals" || n == "Vertex Colors" 
-	  || n == "UV Sets" || n == "Tangents" || n == "Binormals" )
+	  || n == "UV Sets" || n == "Tangents" || n == "Bitangents" )
 	{
 		glDepthFunc( GL_LEQUAL );
 		glNormalColor();
@@ -1006,12 +1104,12 @@ void Mesh::drawSelection() const
 		
 		if ( n == "TSpace" )
 		{
-			for ( int j = 0; j < transVerts.count() && j < transTangents.count() && j < transBinormals.count(); j++ )
+			for ( int j = 0; j < transVerts.count() && j < transTangents.count() && j < transBitangents.count(); j++ )
 			{
 				glVertex( transVerts.value( j ) );
 				glVertex( transVerts.value( j ) + transTangents.value( j ) * normalScale );
 				glVertex( transVerts.value( j ) );
-				glVertex( transVerts.value( j ) + transBinormals.value( j ) * normalScale );
+				glVertex( transVerts.value( j ) + transBitangents.value( j ) * normalScale );
 			}
 		}
 		
@@ -1058,7 +1156,7 @@ void Mesh::drawSelection() const
 			glEnd();
 		}
 	}
-	if ( n == "Binormals" )
+	if ( n == "Bitangents" )
 	{
 		glDepthFunc( GL_LEQUAL );
 		glNormalColor();
@@ -1068,12 +1166,12 @@ void Mesh::drawSelection() const
 		if ( normalScale < 0.1f ) normalScale = 0.1f;
 
 		glBegin( GL_LINES );
-		for ( int j = 0; j < transVerts.count() && j < transBinormals.count(); j++ )
+		for ( int j = 0; j < transVerts.count() && j < transBitangents.count(); j++ )
 		{
 			glVertex( transVerts.value( j ) );
-			glVertex( transVerts.value( j ) + transBinormals.value( j ) * normalScale * 2 );
+			glVertex( transVerts.value( j ) + transBitangents.value( j ) * normalScale * 2 );
 			glVertex( transVerts.value( j ) );
-			glVertex( transVerts.value( j ) - transBinormals.value( j ) * normalScale / 2 );
+			glVertex( transVerts.value( j ) - transBitangents.value( j ) * normalScale / 2 );
 		}
 		glEnd();
 
@@ -1083,9 +1181,9 @@ void Mesh::drawSelection() const
 			glHighlightColor();
 			glBegin( GL_LINES );
 			glVertex( transVerts.value( i ) );
-			glVertex( transVerts.value( i ) + transBinormals.value( i ) * normalScale * 2);
+			glVertex( transVerts.value( i ) + transBitangents.value( i ) * normalScale * 2);
 			glVertex( transVerts.value( i ) );
-			glVertex( transVerts.value( i ) - transBinormals.value( i ) * normalScale / 2 );
+			glVertex( transVerts.value( i ) - transBitangents.value( i ) * normalScale / 2 );
 			glEnd();
 		}
 	}

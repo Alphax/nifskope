@@ -2,7 +2,7 @@
 
 BSD License
 
-Copyright (c) 2005-2010, NIF File Format Library and Tools
+Copyright (c) 2005-2012, NIF File Format Library and Tools
 All rights reserved.
 
 Redistribution and use in source and binary forms, with or without
@@ -698,6 +698,27 @@ public:
 		wxyz[1] = x;
 		wxyz[2] = y;
 		wxyz[3] = z;
+	}
+
+	void normalize ()
+	{
+		float mag = (
+			(wxyz[0]*wxyz[0]) +
+			(wxyz[1]*wxyz[1]) +
+			(wxyz[2]*wxyz[2]) +
+			(wxyz[3]*wxyz[3]));
+		wxyz[0] /= mag;
+		wxyz[1] /= mag;
+		wxyz[2] /= mag;
+		wxyz[3] /= mag;
+	}
+
+	void negate ()
+	{
+		wxyz[0] = -wxyz[0];
+		wxyz[1] = -wxyz[1];
+		wxyz[2] = -wxyz[2];
+		wxyz[3] = -wxyz[3];
 	}
 	
 	//! Array operator

@@ -2,7 +2,7 @@
 
 BSD License
 
-Copyright (c) 2005-2010, NIF File Format Library and Tools
+Copyright (c) 2005-2012, NIF File Format Library and Tools
 All rights reserved.
 
 Redistribution and use in source and binary forms, with or without
@@ -156,7 +156,14 @@ public:
 	bool evalCondition( const QModelIndex & idx, bool chkParents = false ) const;
 	//! Evaluate version.
 	bool evalVersion( const QModelIndex & idx, bool chkParents = false ) const;
-	
+	//! Is name a NiBlock identifier (<niobject abstract="0"> or <niobject abstract="1">)?
+	virtual bool isAncestorOrNiBlock( const QString & /*name*/ ) const { return false; };
+	//! Returns true if name inherits ancestor.
+	virtual bool inherits( const QString & /*name*/, const QString & /*ancestor*/ ) const { return false; };
+	// This is here to avoid compiler confusion with QObject::inherits.
+	bool inherits ( const char * className ) const {
+		return QObject::inherits(className);
+	}
 	//! Get version as a string
 	virtual QString getVersion() const = 0;
 	//! Get version as a number
@@ -234,12 +241,14 @@ protected:
 	//! Get the size of an array
 	int			getArraySize( NifItem * array ) const;
 	//! Evaluate a string for an array
-	int			evaluateString( NifItem * array, const QString & text ) const;
+	int			evaluateInt( NifItem * item, const Expression & expr) const;
 	
 	//! Get an item
 	virtual NifItem *	getItem( NifItem * parent, const QString & name ) const;
 	//! Get an item by name
 	NifItem *	getItemX( NifItem * item, const QString & name ) const; // find upwards
+	//! Find an item by name
+	NifItem *	findItemX( NifItem * item, const QString & name ) const;
 	
 	//! Get an item by name
 	template <typename T> T get( NifItem * parent, const QString & name ) const;
@@ -259,8 +268,6 @@ protected:
 	virtual bool		evalVersion( NifItem * item, bool chkParents = false ) const = 0;
 	//! Evaluate conditions
 	bool		evalCondition( NifItem * item, bool chkParents = false ) const;
-	//! Evaluate conditions
-	bool		evalConditionHelper( NifItem * item, const QString & cond ) const;
 	
 	//! Convert a version number to a string
 	virtual QString ver2str( quint32 ) const = 0;

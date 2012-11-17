@@ -2,7 +2,7 @@
 
 BSD License
 
-Copyright (c) 2005-2010, NIF File Format Library and Tools
+Copyright (c) 2005-2012, NIF File Format Library and Tools
 All rights reserved.
 
 Redistribution and use in source and binary forms, with or without
@@ -38,7 +38,7 @@ THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 //! \file gltools.cpp GL helper functions
 
-BoneWeights::BoneWeights( const NifModel * nif, const QModelIndex & index, int b )
+BoneWeights::BoneWeights( const NifModel * nif, const QModelIndex & index, int b, int vcnt )
 {
 	trans = Transform( nif, index );
 	center = nif->get<Vector3>( index, "Center" );
@@ -54,8 +54,9 @@ BoneWeights::BoneWeights( const NifModel * nif, const QModelIndex & index, int b
 			weights.append( VertexWeight( nif->get<int>( idx, "Index" ), nif->get<float>( idx, "Weight" ) ) );
 		}
 	}
-	else
-		qWarning() << nif->getBlockNumber( index ) << "vertex weights not found";
+	else // create artificial ones, TODO: should they weight nothing* instead?
+		for ( int c = 0; c < vcnt; c++ )
+			weights.append( VertexWeight( c, 1.0f ) );
 }
 
 

@@ -2,7 +2,7 @@
 
 BSD License
 
-Copyright (c) 2005-2010, NIF File Format Library and Tools
+Copyright (c) 2005-2012, NIF File Format Library and Tools
 All rights reserved.
 
 Redistribution and use in source and binary forms, with or without
@@ -30,23 +30,25 @@ THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 ***** END LICENCE BLOCK *****/
 
-#include "uvedit.h"
+#include <QtCore>
+#include <QtGui>
 
 #include "../nifmodel.h"
 #include "../niftypes.h"
 #include "../options.h"
-#include "../gl/gltex.h"
-#include "../gl/gltools.h"
 #include "../NvTriStrip/qtwrapper.h"
 
-#include <math.h>
-#include <GL/glext.h>
+#include "../gl/gltex.h"
+#include "../gl/gltools.h"
+#include "uvedit.h"
 
-#include <QCursor>
-#include <QDialog>
-#include <QInputDialog>
-#include <QTimer>
-#include <QUndoStack>
+#include <math.h>
+#ifdef __APPLE__
+    #include <OPENGL/glu.h>
+#else
+    #include <GL/glu.h>
+#endif
+
 
 #define BASESIZE 512.0
 #define GRIDSIZE 16.0
@@ -196,7 +198,7 @@ void UVWidget::initializeGL()
 	initializeTextureUnits( context() );
 
 	glShadeModel( GL_SMOOTH );
-	glShadeModel( GL_LINE_SMOOTH );
+	//glShadeModel( GL_LINE_SMOOTH );
 
 	glBlendFunc( GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA );
 	glEnable( GL_BLEND );
@@ -551,7 +553,8 @@ bool UVWidget::bindTexture( const QString & filename )
 		//qWarning() << "maximum anisotropy" << max_anisotropy;
 	}
 
-	if ( mipmaps = textures->bind( filename ) )
+	mipmaps = textures->bind( filename );
+	if (mipmaps)
 	{
 		if ( max_anisotropy > 0.0f )
 		{
@@ -590,7 +593,8 @@ bool UVWidget::bindTexture( const QModelIndex & iSource )
 		//qWarning() << "maximum anisotropy" << max_anisotropy;
 	}
 
-	if ( mipmaps = textures->bind( iSource ) )
+	mipmaps = textures->bind( iSource );
+	if (mipmaps)
 	{
 		if ( max_anisotropy > 0.0f )
 		{
@@ -856,7 +860,9 @@ bool UVWidget::setNifData( NifModel * nifModel, const QModelIndex & nifIndex )
 		
 	}
 		
-	foreach( qint32 l, nif->getLinkArray( iShape, "Properties" ) )
+	foreach( qint32 l,
+                 nif->getLinkArray( iShape, "Properties" )
+                 + nif->getLinkArray( iShape, "BS Properties" ))
 	{
 		QModelIndex iTexProp = nif->getBlock( l, "NiTexturingProperty" );
 		if( iTexProp.isValid() )
@@ -898,6 +904,8 @@ bool UVWidget::setNifData( NifModel * nifModel, const QModelIndex & nifIndex )
 			{
 				// TODO: use the BSShaderTextureSet
 				iTexProp = nif->getBlock( l, "BSShaderPPLightingProperty" );
+				if( !iTexProp.isValid() )
+					iTexProp = nif->getBlock( l, "BSLightingShaderProperty" );
 				if( iTexProp.isValid() )
 				{
 					QModelIndex iTexSource = nif->getBlock( nif->getLink( iTexProp, "Texture Set" ) );
@@ -1484,7 +1492,9 @@ void UVWidget::getTexSlots()
 {
 	menuTexSelect->clear();
 	validTexs.clear();
-	foreach( qint32 l, nif->getLinkArray( iShape, "Properties" ) )
+	foreach( qint32 l,
+                 nif->getLinkArray( iShape, "Properties" )
+                 + nif->getLinkArray( iShape, "BS Properties" ) )
 	{
 		QModelIndex iTexProp = nif->getBlock( l, "NiTexturingProperty" );
 		if( iTexProp.isValid() )
@@ -1515,7 +1525,9 @@ void UVWidget::selectTexSlot()
 {
 	QString selected = texSlotGroup->checkedAction()->text();
 	currentTexSlot = texnames.indexOf( selected );
-	foreach( qint32 l, nif->getLinkArray( iShape, "Properties" ) )
+	foreach( qint32 l,
+                 nif->getLinkArray( iShape, "Properties" )
+                 + nif->getLinkArray( iShape, "BS Properties" ) )
 	{
 		QModelIndex iTexProp = nif->getBlock( l, "NiTexturingProperty" );
 		if( iTexProp.isValid() )
@@ -1545,7 +1557,7 @@ void UVWidget::getCoordSets()
 	
 	quint8 numUvSets = nif->get<quint8>( iShapeData, "Num UV Sets" );
 	
-	for ( uint i = 0; i < numUvSets; i++ )
+        for ( int i = 0; i < numUvSets; i++ )
 	{
 		QAction * temp;
 		coordSetSelect->addAction( temp = new QAction( QString( "%1" ).arg( i ), this ) );

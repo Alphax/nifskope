@@ -2,7 +2,7 @@
 
 BSD License
 
-Copyright (c) 2005-2010, NIF File Format Library and Tools
+Copyright (c) 2005-2012, NIF File Format Library and Tools
 All rights reserved.
 
 Redistribution and use in source and binary forms, with or without
@@ -115,6 +115,11 @@ public:
       return evaluateValue(convert).toBool();
    }
 
+   template <class F>
+   int evaluateUInt( const F& convert ) const
+   {
+      return evaluateValue(convert).toUInt();
+   }
 private:
    static Operator operatorFromString(const QString& str);
    void partition(const QString & cond, int offset = 0);

@@ -2,7 +2,7 @@
 
 BSD License
 
-Copyright (c) 2005-2010, NIF File Format Library and Tools
+Copyright (c) 2005-2012, NIF File Format Library and Tools
 All rights reserved.
 
 Redistribution and use in source and binary forms, with or without
@@ -63,6 +63,8 @@ class QUdpSocket;
 
 #include "message.h"
 
+#include "ui/about_dialog.h"
+
 //! \file nifskope.h The main header for NifSkope
 
 //! The main application class for NifSkope. 
@@ -99,6 +101,11 @@ public:
 	 * \param settings The QSettings object to restore the settings from.
 	 */
 	void restore( const QSettings & settings );
+	//! Get Loaded filename
+	/*!
+	 * \return QString of loaded filename
+	 */
+	QString getLoadFileName();
 	
 public slots:
 	//! Set the lineLoad string and load a nif, kf, or kfm file.
@@ -125,8 +132,8 @@ public slots:
 	//! A slot for starting the XML checker.
 	void sltShredder();
 	
-	//! Display the "About NifSkope" window.
-	void about();
+	//! Reset "block details"
+	void sltResetBlockDetails();
 	
 protected slots:
 	//! Select a NIF index
@@ -175,14 +182,11 @@ private:
 	void initDockWidgets();
 	void initToolBars();
 	void initMenu();
+
+    //! "About NifSkope" dialog.
+    QWidget *aboutDialog;
 	
 	void setViewFont( const QFont & );
-
-	//! Copy settings from one config to another, without overwriting keys.
-	/*!
-	 * This is a helper function for migrateSettings().
-	 */
-	void copySettings(QSettings & cfg, const QSettings & oldcfg, const QString name) const;
 
 	//! Migrate settings from older versions of nifskope.
 	void migrateSettings() const;

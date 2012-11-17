@@ -2,7 +2,7 @@
 
 BSD License
 
-Copyright (c) 2005-2010, NIF File Format Library and Tools
+Copyright (c) 2005-2012, NIF File Format Library and Tools
 All rights reserved.
 
 Redistribution and use in source and binary forms, with or without
@@ -30,8 +30,6 @@ THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 ***** END LICENCE BLOCK *****/
 
-#ifdef QT_OPENGL_LIB
-
 // include before GLee.h to avoid compile error on linux
 #include <QDebug>
 #include <QDir>
@@ -42,7 +40,7 @@ THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 #include "GLee.h"
 
-#include <QtOpenGL>
+#include <QGLContext>
 
 #include "glscene.h"
 #include "gltex.h"
@@ -50,7 +48,6 @@ THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #include "../options.h"
 #include "../fsengine/fsmanager.h"
 #include "../fsengine/fsengine.h"
-#include <GL/glext.h>
 
 //! \file gltex.cpp TexCache management
 
@@ -67,17 +64,8 @@ float get_max_anisotropy()
 
 void initializeTextureUnits( const QGLContext * context )
 {
-	QString extensions( (const char *) glGetString(GL_EXTENSIONS) );
-	//foreach ( QString e, extensions.split( " " ) )
-	//	qWarning() << e;
-	
-	//if (!extensions.contains("GL_ARB_texture_compression"))
-	//	qWarning() << "texture compression not supported, some textures may not load";
-
-	// *** check disabled: software decompression is supported ***
-	//if (!extensions.contains("GL_EXT_texture_compression_s3tc"))
-	//	qWarning() << "S3TC texture compression not supported, some textures may not load";
-
+	// detect maximum number of texture slots
+	// (todo: should we use GL_MAX_COMBINED_TEXTURE_IMAGE_UNITS_ARB or similar?)
 	if ( GLEE_ARB_multitexture )
 	{
 		glGetIntegerv( GL_MAX_TEXTURE_UNITS_ARB, &num_texture_units );
@@ -96,23 +84,24 @@ void initializeTextureUnits( const QGLContext * context )
 		glGetFloatv( GL_MAX_TEXTURE_MAX_ANISOTROPY_EXT, & max_anisotropy );
 		//qWarning() << "maximum anisotropy" << max_anisotropy;
 	}
+	else
+	{
+		max_anisotropy = 0;
+	};
 }
 
 bool activateTextureUnit( int stage )
 {
 	if ( num_texture_units <= 1 )
 		return ( stage == 0 );
-	
+
+	// num_texture_units > 1 can only happen if GLEE_ARB_multitexture is true
+	// so glActiveTexture and glClientActiveTexture are supported
 	if ( stage < num_texture_units )
 	{
-		if (GLEE_ARB_texture_compression )
-		{
-			glActiveTexture( GL_TEXTURE0 + stage );
-			glClientActiveTexture( GL_TEXTURE0 + stage );	
-			return true;
-		}
-		else
-			qWarning( "texture compression not supported" );
+		glActiveTexture( GL_TEXTURE0 + stage );
+		glClientActiveTexture( GL_TEXTURE0 + stage );	
+		return true;
 	}
 	return false;
 }
@@ -125,6 +114,8 @@ void resetTextureUnits()
 		return;
 	}
 	
+	// num_texture_units > 1 can only happen if GLEE_ARB_multitexture is true
+	// so glActiveTexture and glClientActiveTexture are supported
 	for ( int x = num_texture_units-1; x >= 0; x-- )
 	{
 		glActiveTexture( GL_TEXTURE0 + x );
@@ -541,5 +532,3 @@ bool TexCache::Tex::savePixelData( NifModel * nif, const QModelIndex & iSource, 
 	//qWarning() << "TexCache::Tex:savePixelData: Packing" << iSource << "from file" << filepath << "to" << iData;
 	return texSaveNIF( nif, filepath, iData );
 }
-
-#endif

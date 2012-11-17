@@ -76,7 +76,7 @@ class spStrippify : public Spell
 			copyArray<Vector3>( nif, iStripData, iData, "Normals" );
 			
 			copyValue<int>( nif, iStripData, iData, "TSpace Flag" );
-			copyArray<Vector3>( nif, iStripData, iData, "Binormals" );
+			copyArray<Vector3>( nif, iStripData, iData, "Bitangents" );
 			copyArray<Vector3>( nif, iStripData, iData, "Tangents" );
 			
 			copyValue<int>( nif, iStripData, iData, "Has Vertex Colors" );
@@ -84,6 +84,7 @@ class spStrippify : public Spell
 			
 			copyValue<int>( nif, iStripData, iData, "Has UV" );
 			copyValue<int>( nif, iStripData, iData, "Num UV Sets" );
+			copyValue<int>( nif, iStripData, iData, "BS Num UV Sets" );
 			copyValue<int>( nif, iStripData, iData, "Num UV Sets 2" );
 			QModelIndex iDstUV = nif->getIndex( iStripData, "UV Sets" );
 			QModelIndex iSrcUV = nif->getIndex( iData, "UV Sets" );
@@ -226,7 +227,7 @@ class spTriangulate : public Spell
 			copyArray<Vector3>( nif, iTriData, iStripData, "Normals" );
 			
 			copyValue<int>( nif, iTriData, iStripData, "TSpace Flag" );
-			copyArray<Vector3>( nif, iTriData, iStripData, "Binormals" );
+			copyArray<Vector3>( nif, iTriData, iStripData, "Bitangents" );
 			copyArray<Vector3>( nif, iTriData, iStripData, "Tangents" );
 			
 			copyValue<int>( nif, iTriData, iStripData, "Has Vertex Colors" );
@@ -234,6 +235,7 @@ class spTriangulate : public Spell
 			
 			copyValue<int>( nif, iTriData, iStripData, "Has UV" );
 			copyValue<int>( nif, iTriData, iStripData, "Num UV Sets" );
+			copyValue<int>( nif, iTriData, iStripData, "BS Num UV Sets" );
 			copyValue<int>( nif, iTriData, iStripData, "Num UV Sets 2" );
 			QModelIndex iDstUV = nif->getIndex( iTriData, "UV Sets" );
 			QModelIndex iSrcUV = nif->getIndex( iStripData, "UV Sets" );

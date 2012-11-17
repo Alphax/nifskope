@@ -6,7 +6,7 @@
 ; (NifTools - http://niftools.sourceforge.net) 
 ; (NSIS - http://nsis.sourceforge.net)
 ;
-; Copyright (c) 2005-2010, NIF File Format Library and Tools
+; Copyright (c) 2005-2012, NIF File Format Library and Tools
 ; All rights reserved.
 ; 
 ; Redistribution and use in source and binary forms, with or without
@@ -43,13 +43,13 @@ SetCompressor /SOLID lzma
 !macro InstallHook
   ; pack dll files
   SetOutPath $INSTDIR
-  File ..\release\libgcc_s_dw2-1.dll
-  File ..\release\mingwm10.dll
-  File ..\release\QtCore4.dll
-  File ..\release\QtGui4.dll
-  File ..\release\QtNetwork4.dll
-  File ..\release\QtOpenGL4.dll
-  File ..\release\QtXml4.dll
+  File ${DLL_RELEASE_FOLDER}\libgcc_s_dw2-1.dll
+  File ${DLL_RELEASE_FOLDER}\mingwm10.dll
+  File ${DLL_RELEASE_FOLDER}\QtCore4.dll
+  File ${DLL_RELEASE_FOLDER}\QtGui4.dll
+  File ${DLL_RELEASE_FOLDER}\QtNetwork4.dll
+  File ${DLL_RELEASE_FOLDER}\QtOpenGL4.dll
+  File ${DLL_RELEASE_FOLDER}\QtXml4.dll
 !macroend
 
 !include "nifskope.nsh"

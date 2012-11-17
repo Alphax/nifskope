@@ -2,7 +2,7 @@
 
 BSD License
 
-Copyright (c) 2005-2010, NIF File Format Library and Tools
+Copyright (c) 2005-2012, NIF File Format Library and Tools
 All rights reserved.
 
 Redistribution and use in source and binary forms, with or without
@@ -144,7 +144,7 @@ public:
 				else if ( i->value().isFileVersion() )
 					return QVariant( i->value().toFileVersion() );
 			}
-			QVariant(0);
+			return QVariant(0);
 		}
 		return v;
 	}
@@ -165,8 +165,6 @@ bool NifModel::evalVersion( NifItem * item, bool chkParents ) const
 	QString vercond = item->vercond();
 	if ( vercond.isEmpty() )
 		return true;
-
-	QString vercond2 = item->verexpr().toString();
 
 	NifModelEval functor(this, getHeaderItem());
 	return item->verexpr().evaluateBool(functor);
@@ -382,7 +380,7 @@ NifItem * NifModel::getItem( NifItem * item, const QString & name ) const
 	{
 		NifItem * child = item->child( c );
 
-		if ( child->name() == name && evalCondition( child ) )
+		if ( child && child->name() == name && evalCondition( child ) )
 			return child;
 	}
 
@@ -900,7 +898,7 @@ void NifModel::insertAncestor( NifItem * parent, const QString & identifier, int
 		msg( Message() << tr("unknown ancestor %1").arg(identifier) );
 }
 
-bool NifModel::inherits( const QString & name, const QString & aunty )
+bool NifModel::inherits( const QString & name, const QString & aunty ) const
 {
 	 if ( name == aunty ) return true;
 	NifBlock * type = blocks.value( name );
@@ -1019,6 +1017,10 @@ QVariant NifModel::data( const QModelIndex & idx, int role ) const
 
 	int column = index.column();
 
+	bool ndr = role == NifSkopeDisplayRole;
+	if (role == NifSkopeDisplayRole)
+		role = Qt::DisplayRole;
+
 	if ( column == ValueCol && item->parent() == root && item->type() == "NiBlock" )
 	{
 		QModelIndex buddy;
@@ -1026,6 +1028,8 @@ QVariant NifModel::data( const QModelIndex & idx, int role ) const
 			buddy = getIndex( index, "File Name" );
 		else if ( item->name() == "NiStringExtraData" )
 			buddy = getIndex( index, "String Data" );
+		//else if ( item->name() == "NiTransformInterpolator" && role == Qt::DisplayRole)
+		//	return QString(tr("TODO: find out who is referring me"));
 		else
 			buddy = getIndex( index, "Name" );
 		if ( buddy.isValid() )
@@ -1057,7 +1061,6 @@ QVariant NifModel::data( const QModelIndex & idx, int role ) const
 		}
 	}
 
-
 	switch ( role )
 	{
 		case Qt::DisplayRole:
@@ -1066,7 +1069,12 @@ QVariant NifModel::data( const QModelIndex & idx, int role ) const
 			{
 				case NameCol:
 				{
-					return item->name();
+					if (ndr)
+						return item->name();
+					QString a = "";
+					if ( itemType( index ) == "NiBlock" )
+						a = QString::number( getBlockNumber( index ) ) + " ";
+					return a + item->name();
 				}	break;
 				case TypeCol:
 				{
@@ -1183,8 +1191,10 @@ QVariant NifModel::data( const QModelIndex & idx, int role ) const
 			switch ( column )
 			{
 				case NameCol:
-					if ( itemType( index ) == "NiBlock" )
-						return QString::number( getBlockNumber( index ) );
+ 					// (QColor, QIcon or QPixmap) as stated in the docs
+					/*if ( itemType( index ) == "NiBlock" )
+						return QString::number( getBlockNumber( index ) );*/
+					return QVariant();
 				default:
 					return QVariant();
 			}
@@ -1317,6 +1327,20 @@ QVariant NifModel::data( const QModelIndex & idx, int role ) const
 		}	return QVariant();
 		case Qt::BackgroundColorRole:
 		{
+			// "notify" about an invalid index in "Triangles"
+			// TODO: checkbox, "show invalid only"
+			if ( column == ValueCol && item->value().type() == NifValue::tTriangle ) {
+				NifItem *nv = findItemX( item, "Num Vertices" );
+				if (!nv) {
+					qWarning() << "Num Vertices is null";
+					return QVariant();
+				}
+				quint32 nvc = nv->value().toCount();
+				Triangle t = item->value().get<Triangle>();
+				if (t[0] >= nvc || t[1] >= nvc || t[2] >= nvc)
+					return QColor::fromRgb(240, 210, 210);
+			}
+
 			if ( column == ValueCol && item->value().isColor() )
 			{
 				return item->value().toColor();
@@ -1593,7 +1617,7 @@ bool NifModel::load( QIODevice & device )
 						// note: some 10.0.1.0 version nifs from Oblivion in certain distributions seem to be missing
 						//		 these four bytes on the havok blocks
 						//		 (see for instance meshes/architecture/basementsections/ungrdltraphingedoor.nif)
-						if ((version < 0x0a020000) and (!blktyp.startsWith("bhk"))) {
+						if ((version < 0x0a020000) && (!blktyp.startsWith("bhk"))) {
 						  int dummy;
 						  device.read( (char *) &dummy, 4 );
 						  if (dummy != 0)
@@ -2073,8 +2097,8 @@ bool NifModel::load( NifItem * parent, NifIStream & stream, bool fast )
 			}
 		}
 		
-		// this value is always little-endian
-		if( child->name() == "Num Blocks" )
+		// these values are always little-endian
+		if( (child->name() == "Num Blocks") || (child->name() == "User Version") || (child->name() == "User Version 2") )
 		{
 			if( version >= 0x14000004 && get<quint8>( getHeaderItem(), "Endian Type" ) == 0 )
 			{

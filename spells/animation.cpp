@@ -3,6 +3,8 @@
 #include <QDebug>
 #include <QFileDialog>
 
+#include "../options.h"
+
 // Brief description is deliberately not autolinked to class Spell
 /*! \file animation.cpp
  * \brief Animation editing spells
@@ -61,6 +63,8 @@ public:
 						throw QString( Spell::tr("this is not a normal .kf file; there should be only NiControllerSequences as root blocks") );
 					
 					QString rootName = kf.get<QString>( iSeq, "Target Name" );
+					if (rootName.isEmpty())
+						rootName = kf.get<QString>( iSeq, "Text Keys Name" );// 10.0.1.0
 					QModelIndex ir = findRootTarget( nif, rootName );
 					
 					if ( ! ir.isValid() )
@@ -88,9 +92,11 @@ public:
 					for ( int r = 0; r < kf.rowCount( iCtrlBlcks ); r++ )
 					{
 						QString nodeName = kf.string( iCtrlBlcks.child( r, 0 ), "Node Name", false );
+						if (nodeName.isEmpty())
+							nodeName = kf.string( iCtrlBlcks.child( r, 0 ), "Target Name", false );// 10.0.1.0
 						if (nodeName.isEmpty()) {
 							QModelIndex iNodeName = kf.getIndex( iCtrlBlcks.child( r, 0 ), "Node Name Offset" );
-							nodeName = iNodeName.sibling( iNodeName.row(), NifModel::ValueCol ).data( Qt::DisplayRole ).toString();
+							nodeName = iNodeName.sibling( iNodeName.row(), NifModel::ValueCol ).data( NifSkopeDisplayRole ).toString();
 						}
 						QModelIndex iCtrlNode = findChildNode( nif, iRoot, nodeName );
 						if ( iCtrlNode.isValid() )

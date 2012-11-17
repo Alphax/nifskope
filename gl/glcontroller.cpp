@@ -2,7 +2,7 @@
 
 BSD License
 
-Copyright (c) 2005-2010, NIF File Format Library and Tools
+Copyright (c) 2005-2012, NIF File Format Library and Tools
 All rights reserved.
 
 Redistribution and use in source and binary forms, with or without
@@ -32,7 +32,7 @@ THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 #include "glcontroller.h"
 #include "glscene.h"
-
+#include "../options.h"
 /*
  *  Controllable
  */
@@ -167,7 +167,7 @@ Controller::Controller( const QModelIndex & index ) : iBlock( index )
 QString Controller::typeId() const
 {
 	if ( iBlock.isValid() )
-		return iBlock.data( Qt::DisplayRole ).toString();
+		return iBlock.data( NifSkopeDisplayRole ).toString();
 	return QString();
 }
 
@@ -431,6 +431,8 @@ template <> bool Controller::interpolate( Matrix & value, const QModelIndex & ar
 				{
 					Quat v1 = nif->get<Quat>( frames.child( last, 0 ), "Value" );
 					Quat v2 = nif->get<Quat>( frames.child( next, 0 ), "Value" );
+					if (Quat::dotproduct( v1, v2 ) < 0)
+						v1.negate ();// don't take the long path
 					Quat v3 = Quat::slerp(x, v1, v2);
 					/*
 					Quat v4;

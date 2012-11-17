@@ -1,0 +1,27 @@
+# generated ones
+Makefile
+Makefile.Debug
+Makefile.Release
+moc_*.cpp
+qrc_*.cpp
+ui_*.h
+
+# compiled 
+*.o
+
+# eclipse project
+.project
+.cproject
+.settings
+
+# qtcreator
+NifSkope.pro.user
+
+# binary
+NifSkope
+
+# VC build dirs
+release
+debug
+# VC debug file
+vc100.pdb

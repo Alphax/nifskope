@@ -2,7 +2,7 @@
 
 BSD License
 
-Copyright (c) 2005-2010, NIF File Format Library and Tools
+Copyright (c) 2005-2012, NIF File Format Library and Tools
 All rights reserved.
 
 Redistribution and use in source and binary forms, with or without
@@ -33,17 +33,16 @@ THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #ifndef UVEDIT_H
 #define UVEDIT_H
 
-#include <QtOpenGL>
-
-#include <QList>
-#include <QMap>
-#include <QString>
+#include <QtCore>
+#include <QtGui>
+#include "../gl/GLee.h"
+#include <QGLContext>
 
 class NifModel;
-class QModelIndex;
-class QUndoStack;
 class TexCache;
 class Vector2;
+
+#undef None // conflicts with Qt
 
 //! Displays and allows editing of UV coordinate data
 class UVWidget : public QGLWidget

@@ -2,7 +2,7 @@
 
 BSD License
 
-Copyright (c) 2005-2010, NIF File Format Library and Tools
+Copyright (c) 2005-2012, NIF File Format Library and Tools
 All rights reserved.
 
 Redistribution and use in source and binary forms, with or without
@@ -32,6 +32,7 @@ THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 #include "basemodel.h"
 #include "niftypes.h"
+#include "options.h"
 
 #include <QByteArray>
 #include <QColor>
@@ -77,113 +78,9 @@ bool BaseModel::isArray( const QModelIndex & index ) const
  
 int BaseModel::getArraySize( NifItem * array ) const
 {
-	return evaluateString( array, array->arr1() );
-}
-
-int BaseModel::evaluateString( NifItem * array, const QString & text ) const
-{
-	NifItem * parent = array->parent();
-	if ( ! parent || parent == root )
-		return -1;
-		
-	if ( text.isEmpty() )
-		return 0;
-	
-	bool ok;
-	int d1 = text.toInt( &ok );
-	if ( ! ok )
-	{
-		QString left, right;
-		
-		// TODO: work out how to deal with brackets...
-		static const char * const exp[] = { " | ", " & ", " / ", " + ", " - ", " * " };
-		static const int num_exp = 6;
-		
-		int c;
-		for ( c = 0; c < num_exp; c++ )
-		{
-			int p = text.indexOf( exp[c] );
-			if ( p > 0 )
-			{
-				left = text.left( p ).trimmed();
-				right = text.right( text.length() - p - strlen( exp[c] ) ).trimmed();
-				break;
-			}
-		}
-		
-		if ( c >= num_exp )
-		{
-			left = text.trimmed();
-			c = 0;
-		}
-	
-		int r = 0; // d1 is left
-		
-		bool ok;
-		
-		if ( ! left.isEmpty() )
-		{
-			d1 = left.toInt( &ok );
-			if ( ! ok )
-			{
-				NifItem * dim1 = parent;
-				
-				while ( left == "ARG" )
-				{
-					if ( ! dim1->parent() )	return 0;
-					left = dim1->arg();
-					dim1 = dim1->parent();
-				}
-				
-				dim1 = getItem( dim1, left );
-				if ( ! dim1 )
-				{
-					msg( Message() << tr("failed to get array size for array") << array->name() );
-					return 0;
-				}
-		
-				if ( dim1->childCount() == 0 )
-					d1 = dim1->value().toCount();
-				else
-				{
-					NifItem * item = dim1->child( array->row() );
-					if ( item )
-						d1 = item->value().toCount();
-					else {
-						msg( Message() << tr("failed to get array size for array ") << array->name() );
-						return 0;
-					};
-				}
-			}
-		}
-		
-		if ( ! right.isEmpty() )
-		{
-			r = right.toInt( &ok );
-			if ( ! ok )
-			{
-				msg( Message() << tr("failed to get array size for array ") << array->name() );
-				return 0;
-			}
-		}
-		
-		switch ( c )
-		{
-			case 0: d1 |= r; break;
-			case 1: d1 &= r; break;
-			case 2: d1 /= r; break;
-			case 3: d1 += r; break;
-			case 4: d1 -= r; break;
-			case 5: d1 *= r; break;
-		}
-	}
-	
-	if ( d1 < 0 )
-	{
-		msg( Message() << tr("invalid array size for array") << array->name() );
-		d1 = -1;
-	}
-	return d1;
+	// shortcut for speed
+	if ( array->arr1().isEmpty() ) return 0;
+	return evaluateInt( array, array->arr1expr() );
 }
 
 bool BaseModel::updateArray( const QModelIndex & array )
@@ -361,7 +258,10 @@ QVariant BaseModel::data( const QModelIndex & index, int role ) const
 		return QVariant();
 	
 	int column = index.column();
-	
+
+	if (role == NifSkopeDisplayRole)
+		role = Qt::DisplayRole;
+
 	switch ( role )
 	{
 		case Qt::DisplayRole:
@@ -611,6 +511,9 @@ NifItem * BaseModel::getItem( NifItem * item, const QString & name ) const
 	return 0;
 }
 
+/*
+*  Uses implicit load order
+*/
 NifItem * BaseModel::getItemX( NifItem * item, const QString & name ) const
 {
 	if ( ! item || ! item->parent() )	return 0;
@@ -625,6 +528,17 @@ NifItem * BaseModel::getItemX( NifItem * item, const QString & name ) const
 	}
 	
 	return getItemX( parent, name );
+}
+
+NifItem * BaseModel::findItemX( NifItem * item, const QString & name ) const
+{
+	while (item) {
+		NifItem *r = getItem (item, name);
+		if (r)
+			return r;
+		item = item->parent();
+	}
+	return 0;
 }
 
 QModelIndex BaseModel::getIndex( const QModelIndex & parent, const QString & name ) const
@@ -663,23 +577,57 @@ public:
 		if ( v.type() == QVariant::String ) {
 			QString left = v.toString();
 			const NifItem * i = item;
+			// resolve "ARG"
 			while ( left == "ARG" ) {
 				if ( ! i->parent() )	return false;
 				i = i->parent();
 				left = i->arg();
 			}
-			i = model->getItem( i->parent(), left );
-			if (i) {
-				if ( i->value().isCount() )
-					return QVariant( i->value().toCount() );
-				else if ( i->value().isFileVersion() )
-					return QVariant( i->value().toFileVersion() );
+			// resolve reference to sibling
+			const NifItem * sibling = model->getItem( i->parent(), left );
+			if (sibling) {
+				if ( sibling->value().isCount() )
+					return QVariant( sibling->value().toCount() );
+				else if ( sibling->value().isFileVersion() )
+					return QVariant( sibling->value().toFileVersion() );
+				// this is tricky to understand
+				// we check whether the reference is an array
+				// if so, we get the current item's row number (i->row())
+				// and get the sibling's child at that row number
+				// this is used for instance to describe array sizes of strips
+				else if ( sibling->childCount() > 0 ) {
+					const NifItem * i2 = sibling->child( i->row() );
+					if ( i2 && i2->value().isCount() )
+						return QVariant(i2->value().toCount());
+				}
+				else {
+					qDebug() << ("can't convert " + left + " to a count");
+				}
+			}
+			// resolve reference to block type
+			// is the condition string a type?
+			if (model->isAncestorOrNiBlock(left)) {
+				// get the type of the current block
+				const NifItem * block = i;
+				while (block->parent() && block->parent()->parent() ) {
+					block = block->parent();
+				};
+				return QVariant(model->inherits(block->name(), left));
 			}
 			return QVariant(0);
 		}
 		return v;
 	}
 };
+
+int BaseModel::evaluateInt( NifItem * item, const Expression & expr ) const
+{
+	if ( ! item || item == root )
+		return -1;
+	
+	BaseModelEval functor(this, item);
+	return expr.evaluateUInt(functor);
+}
 
 bool BaseModel::evalCondition( NifItem * item, bool chkParents ) const
 {
@@ -699,86 +647,6 @@ bool BaseModel::evalCondition( NifItem * item, bool chkParents ) const
 
 	BaseModelEval functor(this, item);
 	return item->condexpr().evaluateBool(functor);
-}
-
-bool BaseModel::evalConditionHelper( NifItem * item, const QString & cond ) const
-{	
-	QString left, right;
-	
-	static const char * const exp[] = { "!=", "==", ">=", "<=", ">", "<", "&", "+", "-" };
-	static const int num_exp = 9;
-	
-	int c;
-	for ( c = 0; c < num_exp; c++ )
-	{
-		int p = cond.indexOf( exp[c] );
-		if ( p > 0 )
-		{
-			left = cond.left( p ).trimmed();
-			right = cond.right( cond.length() - p - strlen( exp[c] ) ).trimmed();
-			break;
-		}
-	}
-	
-	if ( c >= num_exp )
-	{
-		left = cond.trimmed();
-		c = 0;
-	}
-
-	int l = 0;
-	int r = 0;
-	
-	bool ok;
-	
-	if ( ! left.isEmpty() )
-	{
-		l = left.toInt( &ok );
-		if ( ! ok )
-		{
-			NifItem * i = item;
-			
-			while ( left == "ARG" )
-			{
-				if ( ! i->parent() )	return false;
-				i = i->parent();
-				left = i->arg();
-			}
-			
-			i = getItem( i->parent(), left );
-			if ( i )
-				l = i->value().toCount();
-			else
-				l = 0;
-		}
-	}
-	
-	if ( ! right.isEmpty() )
-	{
-		r = right.toInt( &ok );
-		if ( ! ok )
-		{
-			NifItem * i = getItem( item->parent(), right );
-			if ( i )
-				r = i->value().toCount();
-			else
-				r = 0;
-		}
-	}
-	
-	switch ( c )
-	{
-		case 0: return l != r;
-		case 1: return l == r;
-		case 2: return l >= r;
-		case 3: return l <= r;
-		case 4: return l > r;
-		case 5: return l < r;
-		case 6: return l & r;
-		case 7: return l + r;
-		case 8: return l - r;
-		default: return false;
-	}
 }
 
 bool BaseModel::evalVersion( const QModelIndex & index, bool chkParents ) const

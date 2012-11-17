@@ -2,7 +2,7 @@
 
 BSD License
 
-Copyright (c) 2005-2010, NIF File Format Library and Tools
+Copyright (c) 2005-2012, NIF File Format Library and Tools
 All rights reserved.
 
 Redistribution and use in source and binary forms, with or without
@@ -358,7 +358,8 @@ QSize FloatSlider::sizeHint() const
 		h = w;
 		w = x;
     }
-    return style()->sizeFromContents( QStyle::CT_Slider, &opt, QSize( w, h ), this ).expandedTo( QApplication::globalStrut() );
+    return QSize( w, h );
+    //return style()->sizeFromContents( QStyle::CT_Slider, &opt, QSize( w, h ), this ).expandedTo( QApplication::globalStrut() );
 }
 
 QSize FloatSlider::minimumSizeHint() const

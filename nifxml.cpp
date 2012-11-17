@@ -2,7 +2,7 @@
 
 BSD License
 
-Copyright (c) 2005-2010, NIF File Format Library and Tools
+Copyright (c) 2005-2012, NIF File Format Library and Tools
 All rights reserved.
 
 Redistribution and use in source and binary forms, with or without
@@ -336,7 +336,7 @@ public:
 						if ( optId.isEmpty() || optVal.isEmpty() )
 							err( tr("option defintion must have a name and a value") );
 						bool ok;
-						optVal.toInt( &ok, 0 );
+						optVal.toUInt( &ok, 0 );
 						if ( ! ok )
 							err( tr("option value error (only integers please)") );
 						break;
@@ -397,7 +397,7 @@ public:
 			case tagOption:
 				{
 					bool ok;
-					quint32 optValInt = optVal.toInt( &ok, 0 );
+					quint32 optValInt = optVal.toUInt( &ok, 0 );
 					if ( ! ok || ! NifValue::registerEnumOption( typId, optId, optValInt, optTxt ) )
 						err( tr("failed to register enum option") );
 				}
@@ -513,13 +513,14 @@ bool NifModel::loadXML()
 {
 	QDir dir( QApplication::applicationDirPath() );
 	QString fname = dir.filePath( "nif.xml" ); // last resort
-	// Try local copy first, docsys, relative from nifskope/release, linux data dir
+        // Try local copy first, docsys, relative from nifskope/release, relative from ../nifskope-build/release, linux data dir
 	QStringList xmlList( QStringList()
 			<< "nif.xml"
-			<< "../docsys/nif.xml"
-			<< "../../docsys/nif.xml"
-			<< "docsys/nifxml/nif.xml"
-			<< "../docsys/nifxml/nif.xml"
+                        << "docsys/nifxml/nif.xml"
+                        << "../docsys/nifxml/nif.xml"
+                        << "../../docsys/nifxml/nif.xml"
+                        << "../nifskope/docsys/nifxml/nif.xml"
+                        << "../../nifskope/docsys/nifxml/nif.xml"
 			<< "/usr/share/nifskope/nif.xml" );
 	foreach( QString str, xmlList )
 	{

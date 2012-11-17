@@ -2,7 +2,7 @@
 
 BSD License
 
-Copyright (c) 2005-2010, NIF File Format Library and Tools
+Copyright (c) 2005-2012, NIF File Format Library and Tools
 All rights reserved.
 
 Redistribution and use in source and binary forms, with or without
@@ -35,6 +35,8 @@ THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 #include <QObject>
 #include "widgets/groupbox.h"
+
+#define NifSkopeDisplayRole (Qt::UserRole + 42)
 
 //! \file options.h Options class
 
@@ -154,6 +156,8 @@ public:
 	static QLocale translationLocale();
 	// Maximum string length (see NifIStream::init for the current usage)
 	//static int maxStringLength();
+	//! status of Collada Cull setting
+	static bool exportCullEnabled();
 	
 signals:
 	//! Signal emitted when a value changes
@@ -246,6 +250,10 @@ protected:
 	
 	QCheckBox * overrideMatCheck;
 	ColorWheel * matColors[4];
+
+	//////////////////////////////////////////////////////////////////////////
+	// Export Settings page
+	QCheckBox * exportCull;
 	
 	//////////////////////////////////////////////////////////////////////////
 	

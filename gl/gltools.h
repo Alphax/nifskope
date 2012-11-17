@@ -2,7 +2,7 @@
 
 BSD License
 
-Copyright (c) 2005-2010, NIF File Format Library and Tools
+Copyright (c) 2005-2012, NIF File Format Library and Tools
 All rights reserved.
 
 Redistribution and use in source and binary forms, with or without
@@ -33,7 +33,7 @@ THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #ifndef GLTOOLS_H
 #define GLTOOLS_H
 
-#include <QtOpenGL>
+#include <QGLContext>
 
 #include "../niftypes.h"
 
@@ -80,7 +80,7 @@ class BoneWeights
 {
 public:
 	BoneWeights() { bone = 0; }
-	BoneWeights( const NifModel * nif, const QModelIndex & index, int b );
+	BoneWeights( const NifModel * nif, const QModelIndex & index, int b, int vcnt = 0 );
 	
 	Transform trans;
 	Vector3 center; float radius;
@@ -209,5 +209,7 @@ inline GLuint glClosestMatch( GLuint * buffer, GLint hits )
 void renderText(double x, double y, double z, const QString & str);
 void renderText(const Vector3& c, const QString & str);
 
+#define ID2COLORKEY(id) (id + 1)
+#define COLORKEY2ID(id) (id - 1)
 
 #endif

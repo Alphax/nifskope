@@ -2,7 +2,7 @@
 
 BSD License
 
-Copyright (c) 2005-2010, NIF File Format Library and Tools
+Copyright (c) 2005-2012, NIF File Format Library and Tools
 All rights reserved.
 
 Redistribution and use in source and binary forms, with or without
@@ -220,13 +220,14 @@ bool KfmModel::loadXML()
 {
 	QDir dir( QApplication::applicationDirPath() );
 	QString fname = dir.filePath( "kfm.xml" ); // last resort
-	// Try local copy first, docsys, relative from nifskope/release, linux data dir
+        // Try local copy first, docsys, relative from nifskope/release, relative from ../nifskope-build/release linux data dir
 	QStringList xmlList( QStringList()
 			<< "kfm.xml"
-			<< "../docsys/kfm.xml"
-			<< "../../docsys/kfm.xml"
-			<< "docsys/kfmxml/kfm.xml"
-			<< "../docsys/kfmxml/kfm.xml"
+                        << "docsys/kfmxml/kfm.xml"
+                        << "../docsys/kfmxml/kfm.xml"
+                        << "../../docsys/kfmxml/kfm.xml"
+                        << "../nifskope/docsys/kfmxml/kfm.xml"
+                        << "../../nifskope/docsys/kfmxml/kfm.xml"
 			<< "/usr/share/nifskope/kfm.xml" );
 	foreach( QString str, xmlList )
 	{

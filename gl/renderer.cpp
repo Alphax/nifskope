@@ -2,7 +2,7 @@
 
 BSD License
 
-Copyright (c) 2005-2010, NIF File Format Library and Tools
+Copyright (c) 2005-2012, NIF File Format Library and Tools
 All rights reserved.
 
 Redistribution and use in source and binary forms, with or without
@@ -40,8 +40,6 @@ THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #include <QtGui/QtGui>   // dito
 #include "GLee.h"
 
-#include <GL/glext.h>
-
 #include "renderer.h"
 
 #include "gltex.h"
@@ -55,20 +53,26 @@ bool shader_ready = false;
 
 bool Renderer::initialize( const QGLContext * cx )
 {
-	if ( shader_initialized )
-		return shader_ready;
-	
-	shader_initialized = true;
-	
-	QString extensions( (const char *) glGetString(GL_EXTENSIONS) );
-	//qDebug() << extensions << "\n";
-	
-	if ( !GLEE_ARB_shading_language_100|| ! GLEE_ARB_shader_objects || ! GLEE_ARB_vertex_shader || !GLEE_ARB_fragment_shader)
-	{
-		return false;
-	}
-	shader_ready = true;
-	return true;
+    if ( !shader_initialized )
+    {
+#ifdef DISABLE_SHADERS
+        shader_ready = false;
+#else
+        // check for OpenGL 2.0
+        // (we don't use the extension API but the 2.0 API for shaders)
+        if (GLEE_VERSION_2_0)
+        {
+            shader_ready = true;
+        }
+        else
+        {
+            shader_ready = false;
+        }
+#endif
+        //qWarning() << "shader support" << shader_ready;
+        shader_initialized = true;
+    }
+    return shader_ready;
 }
 
 bool Renderer::hasShaderSupport()
@@ -323,7 +327,7 @@ bool Renderer::Program::load( const QString & filepath, Renderer * renderer )
 				QString id = list.value( 1 ).toLower();
 				if ( ! ok || id.isEmpty() )
 					throw QString( "malformed texcoord tag" );
-				if ( id != "tangents" && id != "binormals" && TexturingProperty::getId( id ) < 0 )
+				if ( id != "tangents" && id != "bitangents" && TexturingProperty::getId( id ) < 0 )
 					throw QString( "texcoord tag referres to unknown texture id '%1'" ).arg( id );
 				if ( texcoords.contains( unit ) )
 					throw QString( "texture unit %1 is assigned twiced" ).arg( unit );
@@ -335,18 +339,19 @@ bool Renderer::Program::load( const QString & filepath, Renderer * renderer )
 		
 		GLint result;
 		
-		glGetShaderiv( id, GL_LINK_STATUS, & result );
+		glGetProgramiv( id, GL_LINK_STATUS, & result );
 		
 		if ( result != GL_TRUE )
 		{
 			GLint logLen = 0;
-			glGetShaderiv( id, GL_INFO_LOG_LENGTH, & logLen );
+			glGetProgramiv( id, GL_INFO_LOG_LENGTH, & logLen );
 			if (logLen != 0)
 			{
 				char * log = new char[ logLen ];
-				glGetShaderInfoLog( id, logLen, 0, log );
+				glGetProgramInfoLog( id, logLen, 0, log );
 				QString errlog( log );
 				delete[] log;
+				id = 0;
 				throw errlog;
 			}
 		}
@@ -574,12 +579,12 @@ bool Renderer::setupProgram( Program * prog, Mesh * mesh, const PropertyList & p
 			glEnableClientState( GL_TEXTURE_COORD_ARRAY );
 			glTexCoordPointer( 3, GL_FLOAT, 0, mesh->transTangents.data() );
 		}
-		else if ( itx.value() == "binormals" )
+		else if ( itx.value() == "bitangents" )
 		{
-			if ( ! mesh->transBinormals.count() )
+			if ( ! mesh->transBitangents.count() )
 				return false;
 			glEnableClientState( GL_TEXTURE_COORD_ARRAY );
-			glTexCoordPointer( 3, GL_FLOAT, 0, mesh->transBinormals.data() );
+			glTexCoordPointer( 3, GL_FLOAT, 0, mesh->transBitangents.data() );
 		}
 		else if (texprop != NULL)
 		{

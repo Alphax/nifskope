@@ -2,7 +2,7 @@
 
 BSD License
 
-Copyright (c) 2005-2010, NIF File Format Library and Tools
+Copyright (c) 2005-2012, NIF File Format Library and Tools
 All rights reserved.
 
 Redistribution and use in source and binary forms, with or without
@@ -42,7 +42,7 @@ THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 class Mesh : public Node
 {
 public:
-	Mesh( Scene * s, const QModelIndex & b ) : Node( s, b ) {}
+	Mesh( Scene * s, const QModelIndex & b ) : Node( s, b ) {double_sided = false; double_sided_es = false;}
 	
 	void clear();
 	void update( const NifModel * nif, const QModelIndex & );
@@ -86,8 +86,8 @@ protected:
 	QVector<Color4>  colors;
 	//! Tangents
 	QVector<Vector3> tangents;
-	//! Binormals
-	QVector<Vector3> binormals;
+	//! Bitangents
+	QVector<Vector3> bitangents;
 	
 	//! UV coordinate sets
 	QList< QVector<Vector2> > coords;
@@ -100,8 +100,8 @@ protected:
 	QVector<Color4> transColors;
 	//! Transformed tangents
 	QVector<Vector3> transTangents;
-	//! Transformed binormals
-	QVector<Vector3> transBinormals;
+	//! Transformed bitangents
+	QVector<Vector3> transBitangents;
 	
 	int skelRoot;
 	Transform skelTrans;
@@ -128,6 +128,9 @@ protected:
 	friend class MorphController;
 	friend class UVController;
 	friend class Renderer;
+
+	bool double_sided;
+	bool double_sided_es;
 };
 
 #endif
